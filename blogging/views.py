@@ -1,9 +1,13 @@
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
 from blogging.models import Post
-from django.shortcuts import render
 from django.contrib.syndication.views import Feed
 from django.urls import reverse
+from django.shortcuts import render, redirect
+from django import forms
+from django.utils import timezone
+from blogging.forms import PostForm
+
 
 def stub_view(request, *args, **kwargs):
     body = "Stub View\n\n"
@@ -40,21 +44,25 @@ def detail_view(request, post_id):
     context = {'post': post}
     return render(request, 'blogging/detail.html', context)
 
+def feed_view(Feed):
+    posts = Post.objects.order_by('-published_date')
+    context = {'posts': posts}
+    return render(request, 'blogging/feed.html', context)
 
+def add_model(request):
+    if str(request.user) == "AnonymousUser":
+        return redirect("/accounts/login/")
+    if request.method == "POST":
+        form = PostForm(request.POST)
+        if form.is_valid():
+            model_instance = form.save(commit=False)
+            model_instance.author = request.user
+            model_instance.timestamp = timezone.now()
+            model_instance.save()
+            return redirect('/')
 
-class LatestEntriesFeed(Feed):
-    title = "My Blog RSS"
-    link = "/latest/feeds"
-    description = "Latest update on Blogs."
+    else:
 
-    def items(self):
-        return Post.objects.order_by('-published_date')[:5]
+        form = PostForm()
 
-    def item_title(self, item):
-        return item.title
-
-    def item_description(self, item):
-        return item.text
-
-    def item_link(self, item):
-        return reverse('blog_detail', args=[item.pk])
+        return render(request, "blogging/post_add.html", {'form': form})
